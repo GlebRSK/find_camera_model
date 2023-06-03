@@ -2,12 +2,39 @@ extern crate exif;
 
 use clap::{arg, Command};
 use exif::{Tag, In};
+use walkdir::WalkDir;
+use std::collections::HashSet;
+
+pub fn walking(directory: &str) -> Result<HashSet<String>, walkdir::Error> {
+
+    let mut models_set:HashSet<String> = HashSet::new();
+
+    for entry in WalkDir::new(directory) {
+        if !entry.as_ref().unwrap().file_type().is_dir() {
+            let filename = entry?.path().display().to_string();
+            
+            match exif_reader(&filename) {
+                Ok(e) => {
+                    println!("{} {}", filename, e);
+                    if e != "" {
+                        models_set.insert(e)
+                    } else {
+                        false
+                    }
+                    
+                },
+                Err(_error) => false
+            };
+
+        }
+    }
+
+    Ok(models_set)
+
+}
 
 
-
-pub fn exif_reader(filename: &String) -> Result<(), exif::Error> {
-    println!("{filename}");
-    
+pub fn exif_reader(filename: &String) -> Result<String, exif::Error> {
     let exif_tags = [Tag::Model];
     
     for path in [filename] {    
@@ -19,12 +46,12 @@ pub fn exif_reader(filename: &String) -> Result<(), exif::Error> {
         for &tag in exif_tags.iter() {
             if let Some(field) = exif.get_field(tag, In::PRIMARY) {
                 let f = field.display_value().with_unit(&exif).to_string();
-                println!("{f}");
+                return Ok(f);
             }
         }
     }
 
-    Ok(())
+    Ok("".to_string())
 }
 
 
@@ -36,5 +63,7 @@ fn main() {
 
     let directory = matches.get_one::<String>("directory").expect("required");
 
-    exif_reader(directory);
+    let models_set = walking(directory).unwrap();
+
+    println!("{:?}", models_set);
 }
